@@ -83,11 +83,7 @@
           ];
 
           shellTools = with pkgs; [
-            zoxide
-            fd
-            eza
             just
-            zsh
             git
             uv
           ];
@@ -141,13 +137,9 @@
 
               echo "🐍 Python dev shell (uv2nix) ready 🐥"
 
-              cd $REPO_ROOT/kcl/schemas/go || true
+              cd $REPO_ROOT/kcl_common/schemas/custom/go || true
               go mod tidy || true
               cd - || true
-
-              if [ -n "$PS1" ] && [ -z "$ZSH_VERSION" ]; then
-                exec zsh
-              fi
             '';
           };
         };
