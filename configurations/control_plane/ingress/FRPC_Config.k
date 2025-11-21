@@ -1,5 +1,5 @@
-import schemas.go.frp_schema.frpc as Client
-import schemas.go.frp_schema.frpc.tcp_proxy as Tcp
+import kcl_common.schemas.custom.go.frp_schema.frpc as Client
+import kcl_common.schemas.custom.go.frp_schema.frpc.tcp_proxy as Tcp
 import manifests
 
 services = [

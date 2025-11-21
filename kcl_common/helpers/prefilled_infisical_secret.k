@@ -4,7 +4,7 @@ import k8s.apimachinery.pkg.apis.meta.v1 as meta
 
 schema InfisicalSecret:
     slug: str
-    keys: {str: str}
+    keys: {str:str}
 
     namespace: str = "default"
     envSlug: str = "prod"
@@ -43,11 +43,9 @@ schema InfisicalSecret:
                 secretType = "Opaque"
                 template = {
                     includeAllSecrets = False
-                    data = {
-                        keys[k]: "{{ ." + k + ".Value }}"
-                        for k in keys
-                    }
+                    data = {keys[k]: "{{ ." + k + ".Value }}" for k in keys}
                 }
             }]
         }
     }
+

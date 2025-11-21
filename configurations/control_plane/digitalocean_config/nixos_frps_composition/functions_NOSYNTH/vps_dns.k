@@ -17,41 +17,41 @@ _out: [do_domain.Domain | do_record.Record | [any]] = []
 
 if maybe_droplet_ip:
     _domain = do_domain.Domain {
-        metadata = meta.ObjectMeta { name = "droplet-domain-name" }
+        metadata = meta.ObjectMeta {name = "droplet-domain-name"}
         spec = {
             forProvider = {
-                name      = DOMAIN
+                name = DOMAIN
                 ipAddress = maybe_droplet_ip
             }
-            providerConfigRef = { name = "default" }
+            providerConfigRef = {name = "default"}
         }
     }
 
     _frps = do_record.Record {
-        metadata = meta.ObjectMeta { name = "frps-record" }
+        metadata = meta.ObjectMeta {name = "frps-record"}
         spec = {
             forProvider = {
-                name   = "frps"
+                name = "frps"
                 domain = DOMAIN
-                $type  = "A"
-                ttl    = 300
-                value  = maybe_droplet_ip
+                $type = "A"
+                ttl = 300
+                value = maybe_droplet_ip
             }
-            providerConfigRef = { name = "default" }
+            providerConfigRef = {name = "default"}
         }
     }
 
     _headlamp = do_record.Record {
-        metadata = meta.ObjectMeta { name = "headlamp-record" }
+        metadata = meta.ObjectMeta {name = "headlamp-record"}
         spec = {
             forProvider = {
-                name   = "headlamp"
+                name = "headlamp"
                 domain = DOMAIN
-                $type  = "A"
-                ttl    = 300
-                value  = maybe_droplet_ip
+                $type = "A"
+                ttl = 300
+                value = maybe_droplet_ip
             }
-            providerConfigRef = { name = "default" }
+            providerConfigRef = {name = "default"}
         }
     }
 

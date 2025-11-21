@@ -6,7 +6,7 @@ ready = lambda o: any, statusPath = "atProvider" -> bool {
     len(objstatus) > 0 and all_true([c.status == "True" for c in objstatus]) and status and statusPath in status
 }
 
-exists = lambda ocds: any o: str -> bool {
+exists = lambda ocds: any, o: str -> bool {
     resource = get(ocds, o, {})
     resource != {}
 }
@@ -22,4 +22,6 @@ get = lambda x: any, y: str, d: any -> any {
     x[c] if len(p) == 1 and c in x else d if c not in x else get(x[c], y, d)
 }
 
-is_defined = lambda v { v != Undefined }
+is_defined = lambda v {
+    v != Undefined
+}

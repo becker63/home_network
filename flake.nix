@@ -97,7 +97,7 @@
             kcl
             go
             crossplane-cli
-            kyverno-chainsaw
+            fluxcd
           ];
 
           daggerTools = [ dagger.packages.${system}.dagger ];

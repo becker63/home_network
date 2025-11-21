@@ -1,7 +1,7 @@
 import kcl_common.schemas.crossplane_kcl_function.models.v1beta1.template_fn_crossplane_io_v1beta1_k_c_l_input as func
 import kcl_common.schemas.crossplane_composistion.models.v1.apiextensions_crossplane_io_v1_composition as compdef
 import kcl_common.schemas.crossplane.models.v1.apiextensions_crossplane_io_v1_composite_resource_definition as crd
-import control_plane.digitalocean_config.vars as globalvars
+import configurations.control_plane.digitalocean_config.vars as globalvars
 import k8s.apimachinery.pkg.apis.meta.v1
 import file
 import manifests
@@ -12,7 +12,7 @@ PLURAL = "digitalocean-configs"
 COMPOSITION_NAME = "digitalocean-config-comp"
 XR_NAME = "digitalocean-config"
 
-DEPENDENCIES =  """
+DEPENDENCIES = """
 
                 k8s = "1.31.2"
                 home_network = { git = "https://github.com/becker63/home_network/", commit = "8559064", version = "0.0.2" }
@@ -65,7 +65,7 @@ comp = compdef.Composition {
             apiVersion = "${GROUP}/v1alpha1"
             kind = KIND
         }
-        mode = "Pipeline" 
+        mode = "Pipeline"
         pipeline = [
             generate_function_meta("functions_NOSYNTH/droplet.k", globalvars.steps.droplet)
             generate_function_meta("functions_NOSYNTH/image.k", globalvars.steps.image)

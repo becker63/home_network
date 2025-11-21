@@ -1,5 +1,5 @@
 import kcl_common.schemas.digitalocean.models.v1alpha1.custom_digitalocean_crossplane_io_v1alpha1_image as image
-import control_plane.digitalocean_config.vars as globalvars
+import configurations.control_plane.digitalocean_config.vars as globalvars
 import k8s.apimachinery.pkg.apis.meta.v1
 import manifests
 

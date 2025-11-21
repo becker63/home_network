@@ -174,7 +174,7 @@ func main() {
 	targets := []SchemaTarget{
 		{
 			Dir:      "frp_schema/frpc",
-			Filename: "frpc.schema.json",
+			Filename: "frpcschema.json",
 			Example:  &frpv1.ClientConfig{},
 			PatchProperties: map[string]string{
 				"ClientConfig.proxies":  "array<any>",
@@ -183,7 +183,7 @@ func main() {
 		},
 		{
 			Dir:      "frp_schema/frps",
-			Filename: "frps.schema.json",
+			Filename: "frpsschema.json",
 			Example:  &frpv1.ServerConfig{},
 		},
 		{
@@ -193,7 +193,7 @@ func main() {
 		},
 		{
 			Dir:      "argo-cmp",
-			Filename: "cmp.schema.json",
+			Filename: "cmpschema.json",
 			Example:  &argov1.ConfigManagementPlugin{},
 		},
 	}

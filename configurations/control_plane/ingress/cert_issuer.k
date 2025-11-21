@@ -1,4 +1,4 @@
-import cert_manager.v1 as cert
+import kcl_common.schemas.cert_manager.models.v1 as cert
 import k8s.apimachinery.pkg.apis.meta.v1 as meta
 import manifests
 
@@ -9,8 +9,7 @@ prod_mode: bool = False
 # Shared metadata
 cluster_issuer_name: str = "letsencrypt-prod" if prod_mode else "letsencrypt-staging"
 
-acme_server: str = "https://acme-v02.api.letsencrypt.org/directory" if prod_mode \
-    else "https://acme-staging-v02.api.letsencrypt.org/directory"
+acme_server: str = "https://acme-v02.api.letsencrypt.org/directory" if prod_mode else "https://acme-staging-v02.api.letsencrypt.org/directory"
 
 # ClusterIssuer definition
 cluster_issuer = cert.ClusterIssuer {

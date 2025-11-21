@@ -1,8 +1,8 @@
-import schemas.traefik.models.v1alpha1.traefik_io_v1alpha1_ingress_route as traefik
-import schemas.traefik.models.v1alpha1.traefik_io_v1alpha1_middleware as middleware
-import helpers.prefilled_infisical_secret as I
+import kcl_common.schemas.traefik.models.v1alpha1.traefik_io_v1alpha1_ingress_route as traefik
+import kcl_common.schemas.traefik.models.v1alpha1.traefik_io_v1alpha1_middleware as middleware
+import kcl_common.helpers.prefilled_infisical_secret as I
+import kcl_common.schemas.cert_manager.models.v1 as cert
 import k8s.apimachinery.pkg.apis.meta.v1 as meta
-import cert_manager.v1 as cert
 import manifests
 
 github_oidc = I.InfisicalSecret {
@@ -24,8 +24,8 @@ auth_middleware = middleware.Middleware {
             address = "http://oauth2-proxy.default.svc.cluster.local:4180"
             trustForwardHeader = True
             authResponseHeaders = [
-                "X-Auth-Request-User",
-                "X-Auth-Request-Email",
+                "X-Auth-Request-User"
+                "X-Auth-Request-Email"
                 "X-Auth-Request-Groups"
             ]
         }
@@ -75,8 +75,8 @@ cert_for_headlamp = cert.Certificate {
 }
 
 manifests.yaml_stream([
-    github_oidc,
-    auth_middleware,
-    secure_route,
+    github_oidc
+    auth_middleware
+    secure_route
     cert_for_headlamp
 ])
