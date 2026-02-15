@@ -1,0 +1,2697 @@
+This file is a merged representation of a subset of the codebase, containing files not matching ignore patterns, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching these patterns are excluded: kcl_common/schemas/**
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+configurations/
+  control_plane/
+    base/
+      fluxcd_config.k
+    digitalocean_config/
+      nixos_frps_composition/
+        functions_NOSYNTH/
+          droplet.k
+          image.k
+          vps_dns.k
+        composition.k
+      provider_config.k
+      vars.k
+    helm_releases/
+      cert_manager_release.k
+      crossplane_release.k
+      fluxcd_release.k
+      infisical_release.k
+      traefik_release.k
+    ingress/
+      cert_issuer.k
+      FRPC_Config.k
+      frpc_daemonset.k
+      traefik_secure.k
+  frps_vps/
+    configuration.nix
+    FRPS_Config.k
+    hardware.nix
+  test/
+    test.k
+flake-modules/
+  git-hooks.nix
+  kind-init.nix
+  make-python-cli.nix
+  python.nix
+  uptest.nix
+kcl_common/
+  helpers/
+    emit_only_k8s.k
+    kclrun.k
+    prefilled_infisical_secret.k
+scripts/
+  src/
+    cli/
+      artifacts/
+        cloudcoil_model_gen.py
+        fetch_crds.py
+      manual_kcl_find.py
+    configuration/
+      __init__.py
+      configuration.py
+      load_config.py
+      models.py
+    helpers/
+      docker_helper.py
+      helpers.py
+      kcl_helpers.py
+      kuttl_helper.py
+    kcl_tasks/
+      automation/
+        kcl_synth_yaml.py
+      check/
+        kcl_frp_verify.py
+        kcl_has_export.py
+      e2e/
+        kcl_helm_install.py
+      conftest.py
+    lib/
+      cloudcoil_ext/
+        match.py
+      test_ext/
+        filter.py
+        find_kcl_files.py
+        find_proj_root.py
+        models.py
+        test_factory.py
+  .python-version
+  pyproject.toml
+  todo
+.envrc
+.gitignore
+crds.json
+flake.lock
+flake.nix
+Justfile
+kcl.mod
+kcl.mod.lock
+pyrightconfig.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="flake-modules/kind-init.nix">
+{ pkgs }:
+
+pkgs.writeShellScriptBin "kind-shell-hook" ''
+  #!/usr/bin/env bash
+  if ! kind get clusters | grep -q "^kuttl$"; then
+    echo "🔧 Spinning up Kind cluster 'kuttl'..."
+    kind create cluster --name kuttl
+  else
+    echo "✅ Kind cluster 'kuttl' already exists"
+  fi
+
+  kind get kubeconfig --name kuttl > ./kubeconfig
+  export KUBECONFIG="$PWD/kubeconfig"
+  echo "🌱 KUBECONFIG: $KUBECONFIG"
+  echo "👉 Current context: $(kubectl config current-context)"
+''
+</file>
+
+<file path="flake-modules/make-python-cli.nix">
+{
+  pkgs,
+  name,
+  scriptPath,
+  python,
+}:
+
+pkgs.stdenv.mkDerivation {
+  pname = name;
+  version = "0.1";
+
+  buildInputs = [ python ];
+
+  phases = [ "installPhase" ];
+
+  installPhase = ''
+    mkdir -p $out/bin
+    cp ${scriptPath} $out/bin/${name}.py
+    cat > $out/bin/${name} <<EOF
+    #!/bin/sh
+    export PYTHONPATH=$(dirname $(dirname ${scriptPath}))/src:\$PYTHONPATH
+    exec ${python}/bin/python $out/bin/${name}.py "\$@"
+    EOF
+    chmod +x $out/bin/${name}
+  '';
+}
+</file>
+
+<file path="flake-modules/python.nix">
+{
+  pkgs,
+  system,
+  uv2nixLib,
+  pyproject-nix,
+  pyproject-build-systems,
+  workspaceRoot,
+}:
+
+let
+  workspace = uv2nixLib.workspace.loadWorkspace {
+    inherit workspaceRoot;
+  };
+
+  overlay = workspace.mkPyprojectOverlay {
+    sourcePreference = "wheel";
+  };
+
+  editableOverlay = workspace.mkEditablePyprojectOverlay {
+    root = "$REPO_ROOT"; # runtime env var
+  };
+
+  python = pkgs.python313;
+
+  pythonSet =
+    (pkgs.callPackage pyproject-nix.build.packages {
+      inherit python;
+    }).overrideScope
+      (
+        pkgs.lib.composeManyExtensions [
+          pyproject-build-systems.overlays.default
+          overlay
+          editableOverlay
+        ]
+      );
+
+  virtualenv = pythonSet.mkVirtualEnv "scripts-dev-env" workspace.deps.all;
+
+in
+{
+  inherit virtualenv;
+}
+</file>
+
+<file path="scripts/.python-version">
+3.13
+</file>
+
+<file path=".envrc">
+use flake
+</file>
+
+<file path="pyrightconfig.json">
+{
+  "include": ["scripts"],
+  "extraPaths": ["scripts"],
+  "reportMissingImports": true
+}
+</file>
+
+<file path="configurations/control_plane/digitalocean_config/vars.k">
+schema stepEnum:
+    droplet: str = "droplet"
+    image: str = "image"
+    dns: str = "dns"
+
+schema shared_schema:
+    region: str
+    imageName: str
+
+shared: shared_schema = {
+    region = "nyc3"
+    imageName = "frps_nixos"
+}
+
+steps: stepEnum = {
+    droplet = "droplet"
+    image = "image"
+    dns = "dns"
+}
+</file>
+
+<file path="configurations/control_plane/ingress/frpc_daemonset.k">
+import k8s.api.apps.v1 as apps
+import k8s.api.core.v1 as core
+import .FRPC_Config as frpc
+import json
+import manifests
+
+configs = [core.ConfigMap {
+    metadata: {
+        name: "frpc-config"
+        namespace: "kube-system"
+    }
+    data: {
+        "frpc.json": json.encode(frpc.clientconfig)
+    }
+}]
+
+# Single DaemonSet that runs on all nodes
+sets = [apps.DaemonSet {
+    metadata: {
+        name: "frpc-daemonset"
+        namespace: "kube-system"
+        labels: {
+            app: "frpc"
+        }
+    }
+    spec: {
+        updateStrategy: {
+            "type": "RollingUpdate"
+        }
+        selector: {
+            matchLabels: {
+                app: "frpc"
+            }
+        }
+        template: {
+            metadata: {
+                labels: {
+                    app: "frpc"
+                }
+            }
+            spec: {
+                hostNetwork: True
+                containers: [{
+                    name: "frpc"
+                    image: "snowdreamtech/frpc:v0.58.0"
+                    env: [{
+                        name: "NODE_NAME"
+                        valueFrom: {
+                            fieldRef: {
+                                fieldPath: "spec.nodeName"
+                            }
+                        }
+                    }]
+                    volumeMounts: [{
+                        name: "config-volume"
+                        mountPath: "/etc/frpc/frpc.json"
+                        subPath: "frpc.json"
+                    }]
+                    command: ["/entrypoint.sh"]
+                    readinessProbe: {
+                        tcpSocket: {
+                            port: frpc.clientconfig.serverPort
+                        }
+                        initialDelaySeconds: 1
+                        periodSeconds: 2
+                    }
+                }]
+                volumes: [{
+                    name: "config-volume"
+                    configMap: {
+                        name: "frpc-config"
+                    }
+                }]
+            }
+        }
+    }
+}]
+
+# Emit both ConfigMap and DaemonSet
+manifests.yaml_stream(configs + sets)
+</file>
+
+<file path="configurations/test/test.k">
+import kcl_common.schemas.custom.go.frp_schema.frpc as frpc
+</file>
+
+<file path="flake-modules/git-hooks.nix">
+{ lib, ... }:
+{
+  pre-commit = {
+    hooks = {
+      deny-plaintext-secrets = {
+        enable = true;
+        entry = ''
+          bash -c '
+          if grep -r --exclude-dir=.git "api_key:" secrets/plaintext 2>/dev/null; then
+            echo "❌ Refusing commit: plaintext secrets detected in secrets/plaintext/"
+            exit 1
+          fi
+          echo "✅ No plaintext secrets found."
+          '
+        '';
+        files = "secrets/plaintext/";
+        pass_filenames = false;
+      };
+    };
+  };
+}
+</file>
+
+<file path="flake-modules/uptest.nix">
+{ pkgs }:
+
+let
+  uptestSrc = pkgs.fetchFromGitHub {
+    owner = "crossplane";
+    repo = "uptest";
+    rev = "188d1abb7d4c042b00a1232ad056f6356a398108";
+    hash = "sha256-lbZP31CrQbK4OQMHtg7KaP5UADbuOlTm6r2g4jA+qQQ=";
+  };
+in {
+  uptest = pkgs.buildGoModule {
+    pname = "uptest";
+    version = "0.1.0";
+
+    src = uptestSrc;
+    vendorHash = "sha256-FB9umtWc3DzEbxK3ZYq7QM5sCG4HLg7PwEgCr7nOPCo=";
+
+    subPackages = [ "cmd/uptest" ];
+
+    installPhase = ''
+      mkdir -p $out/bin
+      cp $GOPATH/bin/uptest $out/bin/
+    '';
+  };
+}
+</file>
+
+<file path="scripts/src/cli/manual_kcl_find.py">
+#from fixtures import find_kcl_files, DirEnum
+
+#def quick_check():
+#    print("=== Filtering out FRP_SCHEMA ===")
+#    out1 = find_kcl_files(filter_fn=lambda kf: kf.dirname != DirEnum.FRP_SCHEMA)
+#    for file in out1:
+#        print(file.dirname, file.path)
+
+#    print("\n=== No filter (all files) ===")
+#    out2 = find_kcl_files(filter_fn=lambda kf: True)
+#    for file in out2:
+#        print(file.dirname, file.path)
+
+#if __name__ == "__main__":
+#    quick_check()
+</file>
+
+<file path="scripts/src/configuration/models.py">
+# configuration/models.py
+
+from pathlib import Path
+from typing import List
+from pydantic import BaseModel, ConfigDict
+
+
+class KFile(BaseModel):
+    path: Path
+    model_config = ConfigDict(frozen=True)
+
+
+class RemoteSchema(BaseModel):
+    name: str
+    urls: List[str]
+    model_config = ConfigDict(frozen=True)
+</file>
+
+<file path="scripts/src/helpers/docker_helper.py">
+import time
+from docker.models.containers import Container
+
+
+def wait_for_container_running(container: Container, timeout_secs: float = 5.0, interval: float = 0.2) -> None:
+    elapsed = 0.0
+    while elapsed < timeout_secs:
+        container.reload()
+        if container.status == "running":
+            return
+        time.sleep(interval)
+        elapsed += interval
+    raise RuntimeError(f"Container did not start in time (status: {container.status})")
+
+
+def stop_and_remove_container(container: Container, timeout: int = 3) -> None:
+    try:
+        container.stop(timeout=timeout)
+    except Exception as e:
+        print(f"[WARN] Failed to stop container: {e}")
+    try:
+        container.remove()
+    except Exception as e:
+        print(f"[WARN] Failed to remove container: {e}")
+</file>
+
+<file path="scripts/src/lib/test_ext/find_proj_root.py">
+from pathlib import Path
+
+
+def find_project_root() -> Path:
+    current = Path(__file__).resolve()
+    while True:
+        if (current / "flake.nix").exists():
+            return current
+        if current.parent == current:
+            raise RuntimeError("Could not find project root (missing flake.nix)")
+        current = current.parent
+</file>
+
+<file path="scripts/src/lib/test_ext/models.py">
+from pydantic import BaseModel, Field
+from typing import Callable, List, Optional
+
+from configuration import KFile
+
+
+class KCLTestMetadata(BaseModel):
+    all_files: List[KFile] = Field(default_factory=list)
+    group_filenames: Optional[List[str]] = None
+    group_filter: Optional[Callable[[KFile], bool]] = None
+    file_filter: Optional[Callable[[KFile], bool]] = None
+
+    class Config:
+        arbitrary_types_allowed = True  # Allow KFile and Callable
+</file>
+
+<file path="scripts/todo">
+clean up our test code. For things that depend deeply on specific files just use abs paths. Modify code to support filenames instead of abs strings for make_kcl_group_test(), thats silly, we can reasonibly assume our filenames will be globally unique (or unique based on the broad filter).
+
+Also change up our code to put the filter in the actual test, not in the weird map we have in configuration.py we never have code thats repeated often enough for us to use this, and if we do its fine for the sake of explicitness
+
+Explore cloudcoils cluster management capabilities, might be useful
+
+implement cloudcoil codegen, the docs suggest that we insert crds into our pyproject.yaml. That might be something we can dynamically modify with a script.
+
+prob move to vite with remix for the blog. It was good for learning and we do like mdx but The vendor lock in and poor ssr support is bad.
+</file>
+
+<file path="crds.json">
+[
+  {
+    "name": "traefik",
+    "urls": [
+      "https://raw.githubusercontent.com/traefik/traefik/refs/heads/v3.4/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml"
+    ]
+  },
+  {
+    "name": "infisical_operator",
+    "urls": [
+      "https://raw.githubusercontent.com/Infisical/infisical/refs/heads/main/k8-operator/config/crd/bases/secrets.infisical.com_infisicalsecrets.yaml"
+    ]
+  },
+  {
+    "name": "crossplane_composistion",
+    "urls": [
+      "https://raw.githubusercontent.com/crossplane/crossplane/refs/tags/v1.17.1/cluster/crds/apiextensions.crossplane.io_compositions.yaml"
+    ]
+  },
+  {
+    "name": "crossplane_patch_and_transform",
+    "urls": [
+      "https://raw.githubusercontent.com/crossplane-contrib/function-patch-and-transform/refs/heads/main/package/input/pt.fn.crossplane.io_resources.yaml"
+    ]
+  },
+  {
+    "name": "crossplane_sequencer",
+    "urls": [
+      "https://raw.githubusercontent.com/crossplane-contrib/function-sequencer/refs/heads/main/package/input/sequencer.fn.crossplane.io_inputs.yaml"
+    ]
+  },
+  {
+    "name": "digitalocean",
+    "urls": [
+      "https://raw.githubusercontent.com/crossplane-contrib/provider-upjet-digitalocean/refs/heads/main/package/crds/digitalocean.crossplane.io_providerconfigs.yaml",
+      "https://raw.githubusercontent.com/crossplane-contrib/provider-upjet-digitalocean/refs/heads/main/package/crds/droplet.digitalocean.crossplane.io_droplets.yaml",
+      "https://raw.githubusercontent.com/crossplane-contrib/provider-upjet-digitalocean/refs/heads/main/package/crds/dns.digitalocean.crossplane.io_domains.yaml",
+      "https://raw.githubusercontent.com/crossplane-contrib/provider-upjet-digitalocean/refs/heads/main/package/crds/dns.digitalocean.crossplane.io_records.yaml",
+      "https://raw.githubusercontent.com/crossplane-contrib/provider-upjet-digitalocean/refs/heads/main/package/crds/networking.digitalocean.crossplane.io_ipassignments.yaml",
+      "https://raw.githubusercontent.com/crossplane-contrib/provider-upjet-digitalocean/refs/heads/main/package/crds/networking.digitalocean.crossplane.io_ips.yaml",
+      "https://raw.githubusercontent.com/crossplane-contrib/provider-upjet-digitalocean/refs/heads/main/package/crds/project.digitalocean.crossplane.io_projects.yaml",
+      "https://raw.githubusercontent.com/crossplane-contrib/provider-upjet-digitalocean/refs/heads/main/package/crds/uptime.digitalocean.crossplane.io_alerts.yaml",
+      "https://raw.githubusercontent.com/crossplane-contrib/provider-upjet-digitalocean/refs/heads/main/package/crds/custom.digitalocean.crossplane.io_images.yaml"
+    ]
+  },
+  {
+    "name": "crossplane_kcl_function",
+    "urls": [
+      "https://raw.githubusercontent.com/crossplane-contrib/function-kcl/refs/heads/main/package/input/template.fn.crossplane.io_kclinputs.yaml"
+    ]
+  },
+  {
+    "name": "fluxcd_kustomize_controller",
+    "urls": [
+      "https://raw.githubusercontent.com/fluxcd/kustomize-controller/refs/heads/main/config/crd/bases/kustomize.toolkit.fluxcd.io_kustomizations.yaml"
+    ]
+  },
+  {
+    "name": "fluxcd_source_controller",
+    "urls": [
+      "https://raw.githubusercontent.com/fluxcd/source-controller/refs/heads/main/config/crd/bases/source.toolkit.fluxcd.io_gitrepositories.yaml",
+      "https://raw.githubusercontent.com/fluxcd/source-controller/refs/heads/main/config/crd/bases/source.toolkit.fluxcd.io_helmcharts.yaml"
+    ]
+  },
+  {
+    "name": "fluxcd_helm_controller",
+    "urls": [
+      "https://raw.githubusercontent.com/fluxcd/helm-controller/refs/heads/main/config/crd/bases/helm.toolkit.fluxcd.io_helmreleases.yaml"
+    ]
+  },
+  {
+    "name": "cert_manager",
+    "urls": [
+      "https://raw.githubusercontent.com/cert-manager/cert-manager/refs/heads/master/deploy/crds/crd-certificaterequests.yaml",
+      "https://raw.githubusercontent.com/cert-manager/cert-manager/refs/heads/master/deploy/crds/crd-certificates.yaml",
+      "https://raw.githubusercontent.com/cert-manager/cert-manager/refs/heads/master/deploy/crds/crd-challenges.yaml",
+      "https://raw.githubusercontent.com/cert-manager/cert-manager/refs/heads/master/deploy/crds/crd-clusterissuers.yaml",
+      "https://raw.githubusercontent.com/cert-manager/cert-manager/refs/heads/master/deploy/crds/crd-issuers.yaml",
+      "https://raw.githubusercontent.com/cert-manager/cert-manager/refs/heads/master/deploy/crds/crd-orders.yaml"
+    ]
+  },
+  {
+    "name": "crossplane",
+    "urls": [
+      "https://raw.githubusercontent.com/crossplane/crossplane/refs/heads/main/cluster/crds/apiextensions.crossplane.io_compositeresourcedefinitions.yaml"
+    ]
+  }
+]
+</file>
+
+<file path="configurations/control_plane/digitalocean_config/nixos_frps_composition/functions_NOSYNTH/droplet.k">
+import kcl_common.schemas.digitalocean.models.v1alpha1.custom_digitalocean_crossplane_io_v1alpha1_image as imageExport
+import kcl_common.schemas.digitalocean.models.v1alpha1.droplet_digitalocean_crossplane_io_v1alpha1_droplet as drop
+import configurations.control_plane.digitalocean_config.vars as globalvars
+import k8s.apimachinery.pkg.apis.meta.v1
+import manifests
+import kcl_common.helpers.kclrun as helpers
+
+_ocds = option("params").ocds
+image_resource: imageExport.Image = _ocds[globalvars.steps.droplet]?.Resource
+image_raw = image_resource?.status?.atProvider?.slug
+maybe_imageName = image_raw if helpers.is_defined(image_raw) else None
+
+_out_droplet: [drop.Droplet | any] = []
+
+if maybe_imageName:
+    _droplet = drop.Droplet {
+        metadata = v1.ObjectMeta {
+            name = "nixos-frps-droplet"
+        }
+        spec = {
+            forProvider = {
+                name = "nixos-frps-droplet"
+                region = globalvars.shared.region
+                size = "s-1vcpu-1gb"
+                imageRef = {
+                    name = maybe_imageName
+                }
+                monitoring = True
+                ipv6 = False
+                tags = ["crossplane", "nixos", "frps", "custom"]
+            }
+            providerConfigRef = {
+                name = "default"
+            }
+        }
+    }
+
+    _out_droplet = [_droplet]
+
+manifests.yaml_stream(_out_droplet)
+</file>
+
+<file path="configurations/control_plane/digitalocean_config/nixos_frps_composition/functions_NOSYNTH/image.k">
+import kcl_common.schemas.digitalocean.models.v1alpha1.custom_digitalocean_crossplane_io_v1alpha1_image as image
+import configurations.control_plane.digitalocean_config.vars as globalvars
+import k8s.apimachinery.pkg.apis.meta.v1
+import manifests
+
+_out_image = image.Image {
+    metadata = v1.ObjectMeta {
+        name = "managed_do_image_" + globalvars.shared.imageName
+    }
+    spec = {
+        forProvider = {
+            name = globalvars.shared.imageName
+            url = "https://github.com/becker63/home_network/releases/download/v1.0.0/frps_nixos.qcow2"
+            distribution = "nixos"
+            regions = [globalvars.shared.region]
+            description = "Our ustom nixos frps vm"
+            tags = ["crossplane", "custom-image", "nixos", "networking"]
+        }
+        providerConfigRef = {
+            name = "default"
+        }
+    }
+}
+
+manifests.yaml_stream(_out_image)
+</file>
+
+<file path="configurations/control_plane/digitalocean_config/nixos_frps_composition/functions_NOSYNTH/vps_dns.k">
+import kcl_common.schemas.digitalocean.models.v1alpha1.dns_digitalocean_crossplane_io_v1alpha1_domain as do_domain
+import kcl_common.schemas.digitalocean.models.v1alpha1.dns_digitalocean_crossplane_io_v1alpha1_record as do_record
+import kcl_common.schemas.digitalocean.models.v1alpha1.droplet_digitalocean_crossplane_io_v1alpha1_droplet as do_droplet
+import k8s.apimachinery.pkg.apis.meta.v1 as meta
+import kcl_common.helpers.kclrun as helpers
+import manifests
+
+DOMAIN = "becker63.cloud"
+
+_ocds = option("params").ocds
+droplet_res: do_droplet.Droplet = _ocds[globalvars.steps.droplet]?.Resource
+
+droplet_ip_raw = droplet_res?.status?.atProvider?.ipv4Address
+maybe_droplet_ip = droplet_ip_raw if helpers.is_defined(droplet_ip_raw) else None
+
+_out: [do_domain.Domain | do_record.Record | [any]] = []
+
+if maybe_droplet_ip:
+    _domain = do_domain.Domain {
+        metadata = meta.ObjectMeta {name = "droplet-domain-name"}
+        spec = {
+            forProvider = {
+                name = DOMAIN
+                ipAddress = maybe_droplet_ip
+            }
+            providerConfigRef = {name = "default"}
+        }
+    }
+
+    _frps = do_record.Record {
+        metadata = meta.ObjectMeta {name = "frps-record"}
+        spec = {
+            forProvider = {
+                name = "frps"
+                domain = DOMAIN
+                $type = "A"
+                ttl = 300
+                value = maybe_droplet_ip
+            }
+            providerConfigRef = {name = "default"}
+        }
+    }
+
+    _headlamp = do_record.Record {
+        metadata = meta.ObjectMeta {name = "headlamp-record"}
+        spec = {
+            forProvider = {
+                name = "headlamp"
+                domain = DOMAIN
+                $type = "A"
+                ttl = 300
+                value = maybe_droplet_ip
+            }
+            providerConfigRef = {name = "default"}
+        }
+    }
+
+    _out = [_domain, _frps, _headlamp]
+
+# Emit whatever we built (empty list when IP isn’t ready yet)
+manifests.yaml_stream(_out)
+</file>
+
+<file path="configurations/control_plane/digitalocean_config/nixos_frps_composition/composition.k">
+import kcl_common.schemas.crossplane_kcl_function.models.v1beta1.template_fn_crossplane_io_v1beta1_k_c_l_input as func
+import kcl_common.schemas.crossplane_composistion.models.v1.apiextensions_crossplane_io_v1_composition as compdef
+import kcl_common.schemas.crossplane.models.v1.apiextensions_crossplane_io_v1_composite_resource_definition as crd
+import configurations.control_plane.digitalocean_config.vars as globalvars
+import k8s.apimachinery.pkg.apis.meta.v1
+import file
+import manifests
+
+KIND = "digitalocean-config"
+GROUP = "becker.cloud"
+PLURAL = "digitalocean-configs"
+COMPOSITION_NAME = "digitalocean-config-comp"
+XR_NAME = "digitalocean-config"
+
+DEPENDENCIES = """
+
+                k8s = "1.31.2"
+                home_network = { git = "https://github.com/becker63/home_network/", commit = "8559064", version = "0.0.2" }
+
+                """
+
+generate_function_meta = lambda filepath: str, step: str {
+    _filename = filepath.split("/")[-1]
+    _slug = _filename.split(".")[0]
+
+    {
+        step = step
+        functionRef = {
+            name = "crossplane-contrib-function-kcl"
+        }
+        input = func.KCLInput {
+            metadata = v1.ObjectMeta {
+                name = _slug
+            }
+            spec = {
+                source = file.read(filepath)
+                target = "Resources"
+                dependencies = DEPENDENCIES
+            }
+        }
+    }
+}
+
+xrd = crd.CompositeResourceDefinition {
+    metadata.name = "${PLURAL}.${GROUP}"
+    spec = {
+        group = GROUP
+        names = {
+            kind = KIND
+            plural = PLURAL
+        }
+        versions = [{
+            name = "v1alpha1"
+            served = True
+            referenceable = True
+            schema.openAPIV3Schema = {type = "object"}
+        }]
+    }
+}
+
+comp = compdef.Composition {
+    metadata.name = COMPOSITION_NAME
+    spec = {
+        compositeTypeRef = {
+            apiVersion = "${GROUP}/v1alpha1"
+            kind = KIND
+        }
+        mode = "Pipeline"
+        pipeline = [
+            generate_function_meta("functions_NOSYNTH/droplet.k", globalvars.steps.droplet)
+            generate_function_meta("functions_NOSYNTH/image.k", globalvars.steps.image)
+            generate_function_meta("functions_NOSYNTH/vps_dns.k", globalvars.steps.dns)
+        ]
+    }
+}
+
+xr = {
+    apiVersion = "${GROUP}/v1alpha1"
+    kind = KIND
+    metadata = {name = XR_NAME}
+    spec = {}
+}
+
+manifests.yaml_stream([xrd, comp, xr])
+</file>
+
+<file path="configurations/control_plane/helm_releases/crossplane_release.k">
+import kcl_common.schemas.fluxcd_helm_controller.models.v2.helm_toolkit_fluxcd_io_v2_helm_release as fluxcd_release 
+import manifests 
+
+manifests.yaml_stream([
+fluxcd_release.HelmRelease {
+  metadata.name = "crossplane"
+  metadata.namespace = "crossplane-system"
+
+  spec = {
+    interval = "10m"
+    chart = {
+      spec = {
+        chart = "crossplane"
+        version = "1.17.3"
+        sourceRef = {
+          kind = "HelmRepository"
+          name = "crossplane"
+          namespace = "crossplane-system"
+        }
+      }
+    }
+    install = {
+      createNamespace = True
+    }
+  }
+}
+])
+</file>
+
+<file path="configurations/control_plane/ingress/cert_issuer.k">
+import kcl_common.schemas.cert_manager.models.v1 as cert
+import k8s.apimachinery.pkg.apis.meta.v1 as meta
+import manifests
+
+# Toggle between production and staging
+# Unless we explicitly override this, assume we're not in prod
+prod_mode: bool = False
+
+# Shared metadata
+cluster_issuer_name: str = "letsencrypt-prod" if prod_mode else "letsencrypt-staging"
+
+acme_server: str = "https://acme-v02.api.letsencrypt.org/directory" if prod_mode else "https://acme-staging-v02.api.letsencrypt.org/directory"
+
+# ClusterIssuer definition
+cluster_issuer = cert.ClusterIssuer {
+    metadata = meta.ObjectMeta {
+        name = cluster_issuer_name
+    }
+    spec = {
+        acme = {
+            email = "you@example.com"
+            server = acme_server
+            privateKeySecretRef = {
+                name = cluster_issuer_name + "-account-key"
+            }
+            solvers = [{
+                http01 = {
+                    ingress = {
+                        class = "traefik"
+                    }
+                }
+            }]
+        }
+    }
+}
+
+manifests.yaml_stream([cluster_issuer])
+</file>
+
+<file path="configurations/control_plane/ingress/FRPC_Config.k">
+import kcl_common.schemas.custom.go.frp_schema.frpc as Client
+import kcl_common.schemas.custom.go.frp_schema.frpc.tcp_proxy as Tcp
+import manifests
+
+services = [
+    # Expose Kubernetes ingress controller (port 80)
+    Tcp.TcpproxyConfig {
+        name: "k8s-ingress"
+        $type: "tcp"
+        localIP: "ingress-nginx-controller.kube-system.svc.cluster.local"
+        localPort: 80
+        remotePort: 30080
+        loadBalancer: Tcp.LoadBalancerConfig {
+            group: "k8s"
+            groupKey: "OVERWRITEME!"
+        }
+        healthCheck: Tcp.HealthCheckConfig {
+            $type: "http"
+            path: "/"
+            intervalSeconds: 10
+            timeoutSeconds: 3
+            maxFailed: 3
+        }
+    }
+]
+
+clientconfig = Client.ClientConfig {
+    version: "1.0.0"
+    serverAddr: "frps.example.com"
+    serverPort: 7000
+    auth: Client.AuthClientConfig {
+        token: "OVERWRITEME!"
+    }
+    proxies: services
+}
+
+manifests.yaml_stream([clientconfig])
+</file>
+
+<file path="kcl_common/helpers/emit_only_k8s.k">
+emit = option(key="emit_non_kubernetes", type='bool', default="False", required=False)
+
+# Emit the object if emit_non_kubernetes flag is true, else emit nothing, this helps us be more explicit about non kubernetes resources.
+not_k8s = lambda cfg: [any] -> [any] {
+    [cfg] if emit else []
+}
+</file>
+
+<file path="scripts/src/configuration/load_config.py">
+import json
+from pathlib import Path
+from typing import List
+
+from .models import RemoteSchema
+from .configuration import PROJECT_ROOT
+
+
+CRD_SPEC_PATH = PROJECT_ROOT / "crds.json"
+
+
+def load_crd_specs(path: Path = CRD_SPEC_PATH) -> List[RemoteSchema]:
+    with path.open("r", encoding="utf-8") as f:
+        raw_data = json.load(f)
+    loaded = [RemoteSchema.model_validate(item) for item in raw_data]
+    return loaded
+
+
+# --- Loaded CRD specs ---
+CRD_SPECS = load_crd_specs()
+</file>
+
+<file path="scripts/src/lib/cloudcoil_ext/match.py">
+from typing import Type, TypeVar, List, Union, Mapping, Any, Sequence, cast
+import yaml
+
+from cloudcoil.resources import Resource, Unstructured
+from cloudcoil import apimachinery
+from cloudcoil.models.kubernetes.apps.v1 import Deployment
+from cloudcoil.models.kubernetes.core.v1 import Service
+
+T = TypeVar("T", bound=Resource)
+
+def parse_kcl_yaml(yaml_text: str) -> List[Resource]:
+    objs: List[Resource] = []
+
+    for raw_doc in yaml.safe_load_all(yaml_text):
+        if not isinstance(raw_doc, dict):
+            continue
+
+        try:
+            obj = Unstructured.model_validate(raw_doc)
+            objs.append(obj)
+        except Exception:
+            continue
+
+    return objs
+
+def is_partial_match(struct: Mapping[str, Any], partial: Mapping[str, Any]) -> bool:
+    """
+    Checks whether `partial` is a subset of `struct`.
+    - Exact match for primitive values and lists.
+    - Recursively matches nested dictionaries.
+    """
+    for key, partial_value in partial.items():
+        if key not in struct:
+            return False
+
+        struct_value = struct[key]
+
+        if isinstance(partial_value, dict):
+            if not isinstance(struct_value, dict):
+                return False
+            # Explicitly cast for Pyright
+            if not is_partial_match(
+                cast(Mapping[str, Any], struct_value),
+                cast(Mapping[str, Any], partial_value)
+            ):
+                return False
+
+        elif isinstance(partial_value, list):
+            if not isinstance(struct_value, list):
+                return False
+            if struct_value != partial_value:
+                return False
+
+        else:
+            if struct_value != partial_value:
+                return False
+
+    return True
+
+def find_first_of_type(
+    resources: Sequence[Resource],
+    match: Union[Type[T], T],
+    match_partial: bool = True,
+) -> T:
+    is_partial = not isinstance(match, type)
+    typ: Type[T] = match if isinstance(match, type) else type(match)
+
+    for res in resources:
+        try:
+            res_data = res.model_dump(exclude_none=True, exclude_unset=True)
+            typed_res = typ.model_validate(res_data)
+        except Exception:
+            continue
+
+        if is_partial and match_partial:
+            res_dict = typed_res.model_dump(exclude_none=True, exclude_unset=True)
+            partial_dict = match.model_dump(exclude_none=True, exclude_unset=True)  # type: ignore
+            if not is_partial_match(res_dict, partial_dict):
+                continue
+
+        return typed_res
+
+    raise ValueError(f"Type {typ} with matching spec not found in resources")
+
+
+# --- usage ---
+if __name__ == "__main__":
+    import textwrap
+    yaml_input = textwrap.dedent("""
+        api_version: apps/v1
+        kind: Deployment
+        metadata:
+          name: nginx
+        spec:
+          replicas: 2
+          selector:
+            match_labels:
+              app: nginx
+          template:
+            metadata:
+              labels:
+                app: nginx
+            spec:
+              containers:
+              - name: nginx
+                image: nginx:latest
+                ports:
+                - container_port: 80
+        ---
+        api_version: v1
+        kind: Service
+        metadata:
+          name: nginx-svc
+        spec:
+          selector:
+            app: nginx
+          ports:
+          - port: 80
+            target_port: 80
+        ---
+        api_version: v1
+        kind: Service
+        metadata:
+          name: other-svc
+        spec:
+          selector:
+            app: other-app
+          ports:
+          - port: 8080
+            target_port: 8080
+    """)
+
+    resources = parse_kcl_yaml(yaml_input)
+
+    deployment: Deployment = find_first_of_type(resources, Deployment)
+
+    service: Service = find_first_of_type(resources, Service(
+        metadata=apimachinery.ObjectMeta(name="other-svc")
+    ))
+
+    # print("Service metadata:", service.metadata)
+    print(yaml.dump(service.model_dump(exclude_none=True, exclude_unset=True)))
+</file>
+
+<file path="scripts/src/lib/test_ext/filter.py">
+from typing import Any, TypeAlias
+
+from configuration import KFile
+
+TestCase: TypeAlias = Any  # pytest.param(...)
+
+
+from collections.abc import Callable
+
+def filter_kcl_files(
+    kcl_files: list[KFile],
+    filter_fn: Callable[[KFile], bool]
+) -> list[tuple[KFile, KFile]]:
+    return [
+        (pf, kf)
+        for pf in kcl_files
+        for kf in kcl_files
+        if filter_fn(kf)
+    ]
+</file>
+
+<file path="scripts/src/lib/test_ext/find_kcl_files.py">
+from collections.abc import Callable
+from pathlib import Path
+from configuration import KCL_ROOT, KFile
+
+def find_kcl_files(
+    root: Path | None = None,
+    filter_fn: Callable[[KFile], bool] = lambda kf: True,
+    glob_pattern: str | None = None,
+) -> list[KFile]:
+    if root is None:
+        root = KCL_ROOT
+    if glob_pattern is None:
+        glob_pattern = "*.k"
+
+    results: list[KFile] = []
+
+    for file_path in root.rglob(glob_pattern):
+        if not file_path.is_file():
+            continue
+
+        kf = KFile(path=file_path)
+        if filter_fn(kf):
+            results.append(kf)
+
+    return results
+</file>
+
+<file path="configurations/control_plane/base/fluxcd_config.k">
+import kcl_common.schemas.fluxcd_source_controller.models.v1.source_toolkit_fluxcd_io_v1_git_repository as fluxcd
+import kcl_common.schemas.fluxcd_kustomize_controller.models.v1 as kustomize
+import k8s.apimachinery.pkg.apis.meta.v1 as meta
+import manifests
+
+# GitRepository: watches the full repo
+fluxrepo = fluxcd.GitRepository {
+    metadata = meta.ObjectMeta {
+        name = "home-network"
+        namespace = "flux-system"
+    }
+    spec = {
+        url = "https://github.com/becker63/home-network"
+        interval = "1m"
+        ref = {
+            branch = "main"
+        }
+    }
+}
+
+# Kustomization: only applies manifests from ./synth_yaml
+fluxkust = kustomize.Kustomization {
+    metadata = meta.ObjectMeta {
+        name = "apply-synth"
+        namespace = "flux-system"
+    }
+    spec = {
+        interval = "1m"
+        sourceRef = {
+            kind = "GitRepository"
+            name = "home-network"
+        }
+        path = "./synth_yaml"
+        prune = True
+        targetNamespace = "default"
+    }
+}
+
+manifests.yaml_stream([fluxrepo, fluxkust])
+</file>
+
+<file path="configurations/control_plane/digitalocean_config/provider_config.k">
+import manifests
+import kcl_common.schemas.digitalocean.models.v1beta1.digitalocean_crossplane_io_v1beta1_provider_config as do_provider
+import k8s.apimachinery.pkg.apis.meta.v1 as meta
+import kcl_common.helpers.prefilled_infisical_secret as I
+
+do_api_token = I.InfisicalSecret {
+    slug = "digitalocean-provider-token"
+    keys = {
+        "DIGITALOCEAN_ACCESS_TOKEN": "token"
+    }
+}
+
+do_provider_config = do_provider.ProviderConfig {
+    metadata = meta.ObjectMeta {
+        name = "default"
+    }
+    spec = {
+        credentials = {
+            source = "Secret"
+            secretRef = {
+                namespace = "default"
+                name = "digitalocean-provider-token"
+                key = "DIGITALOCEAN_ACCESS_TOKEN"
+            }
+        }
+    }
+}
+
+manifests.yaml_stream([
+    do_api_token,
+    do_provider_config
+])
+</file>
+
+<file path="configurations/control_plane/helm_releases/fluxcd_release.k">
+import kcl_common.schemas.fluxcd_helm_controller.models.v2.helm_toolkit_fluxcd_io_v2_helm_release as fluxcd_release
+import manifests
+
+manifests.yaml_stream([
+    fluxcd_release.HelmRelease {
+        metadata.name = "fluxcd"
+        metadata.namespace = "flux-system"
+        spec = {
+            interval = "10m"
+            chart = {
+                spec = {
+                    chart = "flux2"
+                    version = "2.10.0"
+                    sourceRef = {
+                        kind = "HelmRepository"
+                        name = "fluxcd"
+                        namespace = "flux-system"
+                    }
+                }
+            }
+            install = {
+                createNamespace = True
+            }
+            values = {
+                installCRDs = True
+            }
+        }
+    }
+])
+</file>
+
+<file path="configurations/control_plane/helm_releases/infisical_release.k">
+import kcl_common.schemas.fluxcd_helm_controller.models.v2.helm_toolkit_fluxcd_io_v2_helm_release as fluxcd_release
+import manifests
+
+manifests.yaml_stream([
+    fluxcd_release.HelmRelease {
+        metadata.name = "infisical-secrets-operator"
+        metadata.namespace = "infisical"
+        spec = {
+            interval = "10m"
+            chart = {
+                spec = {
+                    chart = "secrets-operator"
+                    version = "0.1.0"
+                    sourceRef = {
+                        kind = "HelmRepository"
+                        name = "infisical"
+                        namespace = "infisical"
+                    }
+                }
+            }
+            install = {
+                createNamespace = True
+            }
+        }
+    }
+])
+</file>
+
+<file path="configurations/control_plane/helm_releases/traefik_release.k">
+import kcl_common.schemas.fluxcd_helm_controller.models.v2.helm_toolkit_fluxcd_io_v2_helm_release as fluxcd_release
+import manifests
+
+manifests.yaml_stream([
+    fluxcd_release.HelmRelease {
+        metadata.name = "traefik"
+        metadata.namespace = "traefik"
+        spec = {
+            interval = "10m"
+            chart = {
+                spec = {
+                    chart = "traefik"
+                    version = "21.2.0"
+                    sourceRef = {
+                        kind = "HelmRepository"
+                        name = "traefik"
+                        namespace = "traefik"
+                    }
+                }
+            }
+            install = {
+                createNamespace = True
+            }
+        }
+    }
+])
+</file>
+
+<file path="configurations/control_plane/ingress/traefik_secure.k">
+import kcl_common.schemas.traefik.models.v1alpha1.traefik_io_v1alpha1_ingress_route as traefik
+import kcl_common.schemas.traefik.models.v1alpha1.traefik_io_v1alpha1_middleware as middleware
+import kcl_common.helpers.prefilled_infisical_secret as I
+import kcl_common.schemas.cert_manager.models.v1 as cert
+import k8s.apimachinery.pkg.apis.meta.v1 as meta
+import manifests
+
+github_oidc = I.InfisicalSecret {
+    slug = "github-oidc-secret"
+    keys = {
+        "GITHUB_OIDC_CLIENT_ID": "clientID"
+        "GITHUB_OIDC_CLIENT_SECRET": "clientSecret"
+    }
+}
+
+# --- 1. Middleware: ForwardAuth to oauth2-proxy ---
+auth_middleware = middleware.Middleware {
+    metadata = meta.ObjectMeta {
+        name = "auth-forward"
+        namespace = "default"
+    }
+    spec = {
+        forwardAuth = {
+            address = "http://oauth2-proxy.default.svc.cluster.local:4180"
+            trustForwardHeader = True
+            authResponseHeaders = [
+                "X-Auth-Request-User"
+                "X-Auth-Request-Email"
+                "X-Auth-Request-Groups"
+            ]
+        }
+    }
+}
+
+# --- 2. IngressRoute: Uses middleware and TLS via cert-manager ---
+secure_route = traefik.IngressRoute {
+    metadata = meta.ObjectMeta {
+        name = "headlamp-websecure"
+        namespace = "default"
+    }
+    spec = {
+        entryPoints = ["websecure"]
+        routes = [{
+            match = "Host(`headlamp.example.com`)"
+            kind = "Rule"
+            services = [{
+                name = "headlamp"
+                port = 80
+            }]
+            middlewares = [{
+                name = "auth-forward"
+                namespace = "default"
+            }]
+        }]
+        tls = {
+            secretName = "headlamp-tls"
+        }
+    }
+}
+
+# --- 3. Certificate: Trigger cert-manager issuance via ClusterIssuer ---
+cert_for_headlamp = cert.Certificate {
+    metadata = meta.ObjectMeta {
+        name = "headlamp-cert"
+        namespace = "default"
+    }
+    spec = {
+        secretName = "headlamp-tls"
+        dnsNames = ["headlamp.example.com"]
+        issuerRef = {
+            name = "letsencrypt-prod"
+            kind = "ClusterIssuer"
+        }
+    }
+}
+
+manifests.yaml_stream([
+    github_oidc
+    auth_middleware
+    secure_route
+    cert_for_headlamp
+])
+</file>
+
+<file path="configurations/frps_vps/FRPS_Config.k">
+import kcl_common.schemas.custom.go.frp_schema.frps as Server
+import manifests
+import kcl_common.helpers.emit_only_k8s as emiter
+
+serverconfig = Server.ServerConfig {
+    version: "v0.62.1"
+    auth: Server.AuthServerConfig {
+        token: "OVERWRITEME!"
+    }
+    bindAddr: "0.0.0.0"
+    bindPort: 7000
+    log: Server.LogConfig {
+        level: "info"
+        maxDays: 7
+    }
+    transport: Server.ServerTransportConfig {
+        heartbeatTimeout: 60
+    }
+    detailedErrorsToClient: True
+}
+
+manifests.yaml_stream(emiter.not_k8s([serverconfig]))
+</file>
+
+<file path="kcl_common/helpers/kclrun.k">
+import regex
+
+ready = lambda o: any, statusPath = "atProvider" -> bool {
+    status = o?.Resource?.status
+    objstatus = status?.conditions or []
+    len(objstatus) > 0 and all_true([c.status == "True" for c in objstatus]) and status and statusPath in status
+}
+
+exists = lambda ocds: any, o: str -> bool {
+    resource = get(ocds, o, {})
+    resource != {}
+}
+
+get = lambda x: any, y: str, d: any -> any {
+    """
+            Get an item from a dictionary using a dot separated path.
+            If the item is not found, return a default value.
+            """
+    p = regex.split(y, "\.")
+    c = p[0]
+    y = ".".join(p[1::])
+    x[c] if len(p) == 1 and c in x else d if c not in x else get(x[c], y, d)
+}
+
+is_defined = lambda v {
+    v != Undefined
+}
+</file>
+
+<file path="kcl_common/helpers/prefilled_infisical_secret.k">
+import regex
+import kcl_common.schemas.infisical_operator.models.v1alpha1.secrets_infisical_com_v1alpha1_infisical_secret as infisical
+import k8s.apimachinery.pkg.apis.meta.v1 as meta
+
+schema InfisicalSecret:
+    slug: str
+    keys: {str:str}
+
+    namespace: str = "default"
+    envSlug: str = "prod"
+    tokenSecretName: str = "infisical-token"
+    tokenSecretNamespace: str = "default"
+
+    # Sanitize slug to use as base path component: lowercase, hyphenated, alphanumeric only
+    basePath: str = "/" + regex.replace(slug, "[^a-zA-Z0-9_-]", "-")
+
+    secretsPath: str = basePath
+
+    secret: infisical.InfisicalSecret = {
+        metadata = meta.ObjectMeta {
+            name = slug
+            namespace = namespace
+        }
+        spec = {
+            resyncInterval = 60
+            authentication = {
+                serviceToken = {
+                    serviceTokenSecretReference = {
+                        secretName = tokenSecretName
+                        secretNamespace = tokenSecretNamespace
+                    }
+                    secretsScope = {
+                        envSlug = envSlug
+                        secretsPath = secretsPath
+                        recursive = False
+                    }
+                }
+            }
+            managedKubeSecretReferences = [{
+                secretName = slug
+                secretNamespace = namespace
+                creationPolicy = "Orphan"
+                secretType = "Opaque"
+                template = {
+                    includeAllSecrets = False
+                    data = {keys[k]: "{{ ." + k + ".Value }}" for k in keys}
+                }
+            }]
+        }
+    }
+</file>
+
+<file path="scripts/src/helpers/kuttl_helper.py">
+import subprocess
+from pathlib import Path
+from subprocess import CompletedProcess
+
+
+
+def run_kuttl_test(
+    tmp_dir: Path,
+    test_name: str,
+    resource_yaml: str,
+    assert_yaml: str,
+    timeout: int = 20,
+    namespace: str = "default",
+    start_kind_cluster: bool = False,
+) -> CompletedProcess[str]:
+
+    test_dir = tmp_dir / test_name
+    test_dir.mkdir(parents=True, exist_ok=True)
+
+    (test_dir / "test.yaml").write_text(resource_yaml)
+    (test_dir / "assert.yaml").write_text(assert_yaml)
+
+    cmd = [
+        "kubectl", "kuttl", "test", str(test_dir),
+        "--timeout", str(timeout),
+        "--namespace", namespace,
+    ]
+
+    # Return process object to inspect exit code or output
+    return subprocess.run(cmd, capture_output=True, text=True)
+</file>
+
+<file path="kcl.mod.lock">
+[dependencies]
+  [dependencies.k8s]
+    name = "k8s"
+    full_name = "k8s_1.32.4"
+    version = "1.32.4"
+    sum = "WrltC/mTXtdzmhBZxlvM71wJL5C/UZ/vW+bF3nFvNbM="
+</file>
+
+<file path="scripts/src/cli/artifacts/cloudcoil_model_gen.py">
+from __future__ import annotations
+import re
+import logging
+import sys
+from concurrent.futures import Future, ProcessPoolExecutor, as_completed
+from typing import Dict
+from cloudcoil.codegen.generator import ModelConfig, generate, Transformation
+from configuration import CRD_SPECS, RemoteSchema, PROJECT_ROOT
+from helpers.helpers import remove_path
+from importlib.resources import files
+from pathlib import Path
+
+import os
+
+class ColoredFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord):
+        colors = [31, 32, 33, 34, 35, 36, 91, 92, 93, 94, 95, 96]
+        # Hash process ID for unique coloring per process
+        color_key = f"{os.getpid()}"
+        color_code = colors[hash(color_key) % len(colors)]
+        formatted_msg = super().format(record)
+        return f"\033[{color_code}m{formatted_msg}\033[0m"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s - %(name)s - %(message)s",
+    handlers=[logging.StreamHandler()]
+)
+logging.getLogger().handlers[0].setFormatter(ColoredFormatter("%(levelname)s - %(name)s - %(message)s"))
+
+logger = logging.getLogger(__name__)
+
+def generate_spec(spec: RemoteSchema) -> str:
+    try:
+        namespace: str = "src.ccgen." + spec.name
+        config: ModelConfig = ModelConfig(
+            namespace=namespace,
+            input_=spec.urls,
+            mode="resource",
+            log_level="DEBUG",
+            additional_datamodel_codegen_args=["--extra-fields", "allow"],
+            transformations=[
+                Transformation(
+                    match_=re.compile(r"^io\.k8s\.apimachinery\.pkg\.apis\.meta\.v1\.ObjectMeta$"),
+                    replace="apimachinery.ObjectMeta",
+                    namespace="cloudcoil",
+                )
+            ]
+        )
+        logger.info(f"Starting generation for {spec.name}")
+        generate(config)
+        logger.info(f"Completed generation for {spec.name}")
+        return f"SUCCESS: {spec.name}"
+    except Exception as e:
+        error_msg: str = f"ERROR in {spec.name}: {e}"
+        logger.error(error_msg)
+        return f"ERROR: {spec.name} - {str(e)}"
+
+def main():
+    with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
+        specs_to_process = CRD_SPECS
+
+        future_to_spec: Dict[Future[str], RemoteSchema] = {
+            executor.submit(generate_spec, spec): spec
+            for spec in specs_to_process
+        }
+
+        # Process results as they complete
+        for future in as_completed(future_to_spec):
+            spec: RemoteSchema = future_to_spec[future]
+            try:
+                result: str = future.result()
+                logger.info(f"Result for {spec.name}: {result}")
+                if result.startswith("ERROR:"):
+                    logger.error("Stopping due to error")
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    sys.exit(1)
+            except Exception as e:
+                logger.error(f"Exception for {spec.name}: {e}")
+                executor.shutdown(wait=False, cancel_futures=True)
+                sys.exit(1)
+
+if __name__ == "__main__":
+    remove_path(PROJECT_ROOT / "scripts" / "src" / "ccgen")
+
+    (ccgen_root := PROJECT_ROOT / "scripts" / "src" / "ccgen").mkdir(parents=True, exist_ok=True)
+
+    # dont ask wtf files is I have no idea
+    tmpl_dir = Path(str(files("cloudcoil.codegen"))) / "templates" / "pydantic_v2"
+    tmpl_dir.mkdir(parents=True, exist_ok=True)
+
+    # Allow all extra fields by hacking around cloudcoils cookiecutter config
+    # I dont remmeber why we needed this lol
+    (tmpl_dir / "ConfigDict.jinja2").write_text(
+        '{% if extra_fields %}\nmodel_config = ConfigDict(extra="{{ extra_fields }}")\n{% endif %}\n'
+    )
+
+    (ccgen_root / "__init__.py").touch()
+    main()
+</file>
+
+<file path="scripts/src/cli/artifacts/fetch_crds.py">
+#!/usr/bin/env python3
+
+import subprocess
+import urllib.request
+import tempfile
+from pathlib import Path
+from configuration import CRD_SPECS, SCHEMA_ROOT
+
+
+def download(url: str, dest: Path) -> None:
+    print(f"📥 Downloading {url}")
+    with urllib.request.urlopen(url) as response:
+        dest.write_bytes(response.read())
+
+
+def fetch_crds() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+
+        for schema in CRD_SPECS:
+            print(f"\n📦 Fetching {schema.name} CRDs...")
+            schema_dir = SCHEMA_ROOT / schema.name
+            schema_dir.mkdir(parents=True, exist_ok=True)
+
+            crd_dir = tmp_path / schema.name
+            crd_dir.mkdir(parents=True)
+
+            for url in schema.urls:
+                filename = url.split("/")[-1]
+                download(url, crd_dir / filename)
+
+            yaml_files = list(crd_dir.glob("*.yaml")) + list(crd_dir.glob("*.yml"))
+            if not yaml_files:
+                raise FileNotFoundError(f"❌ No YAML files found for {schema.name}")
+
+            print(f"📥 Importing {schema.name} CRDs to {schema_dir}")
+            subprocess.run(
+                ["kcl", "import", "-m", "crd", *map(str, yaml_files), "--output", str(schema_dir)],
+                check=True,
+            )
+
+
+if __name__ == "__main__":
+    fetch_crds()
+</file>
+
+<file path="scripts/src/helpers/helpers.py">
+import subprocess
+import socket
+
+def get_free_port() -> int:
+    """Bind to port 0 to let the OS choose a free port, then close and return it."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        return s.getsockname()[1]
+
+class CommandError(Exception):
+    def __init__(self, extra_info: str | None = None):
+        super().__init__()
+        self.__rich_info__ = extra_info
+
+    def __str__(self) -> str:
+        return "your command broke dawg"
+
+def run_command(cmd: list[str], kf_name: str | None = None) -> str:
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        raise CommandError(
+            extra_info=e.stderr.strip() or e.stdout.strip() or "No stderr or stdout output"
+        ) from e
+
+import shutil
+from pathlib import Path
+
+def remove_path(p: Path):
+    if not p.exists():
+        return
+
+    if p.is_dir():
+        shutil.rmtree(p)
+    else:
+        p.unlink()
+</file>
+
+<file path="scripts/src/lib/test_ext/test_factory.py">
+from typing import TypeVar, Callable, ParamSpec
+from configuration import KFile
+
+
+F = TypeVar("F", bound=Callable[..., object])
+
+def make_kcl_test(filter_fn: Callable[[KFile], bool]) -> Callable[[F], F]:
+    def decorator(test_func: F) -> F:
+        test_func._kcl_filter_fn = filter_fn  # type: ignore[attr-defined]
+        return test_func
+    return decorator
+
+P = ParamSpec("P")
+
+def make_kcl_named_test(
+    filenames: list[str],
+    filter_fn: Callable[[KFile], bool],
+) -> Callable[[F], F]:
+    def decorator(func: F) -> F:
+        setattr(func, "_kcl_group_filenames", filenames)
+        setattr(func, "_kcl_group_filter", filter_fn)
+        return func
+    return decorator
+</file>
+
+<file path="flake.lock">
+{
+  "nodes": {
+    "dagger": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1749566556,
+        "narHash": "sha256-21jLzhfw+sjWVnT75gLGYfg5ur9rIDEcurQ1OiCF5ow=",
+        "owner": "dagger",
+        "repo": "nix",
+        "rev": "0352c1026a01a61fe09bc801825697d7f86c3dc2",
+        "type": "github"
+      },
+      "original": {
+        "owner": "dagger",
+        "repo": "nix",
+        "type": "github"
+      }
+    },
+    "flake-compat": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1696426674,
+        "narHash": "sha256-kvjfFW7WAETZlt09AgDn1MrtKzP7t90Vf7vypd3OL1U=",
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "rev": "0f9255e01c2351cc7d116c072cb317785dd33b33",
+        "type": "github"
+      },
+      "original": {
+        "owner": "edolstra",
+        "repo": "flake-compat",
+        "type": "github"
+      }
+    },
+    "flake-parts": {
+      "inputs": {
+        "nixpkgs-lib": "nixpkgs-lib"
+      },
+      "locked": {
+        "lastModified": 1743550720,
+        "narHash": "sha256-hIshGgKZCgWh6AYJpJmRgFdR3WUbkY04o82X05xqQiY=",
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "rev": "c621e8422220273271f52058f618c94e405bb0f5",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "type": "github"
+      }
+    },
+    "gitignore": {
+      "inputs": {
+        "nixpkgs": [
+          "pre-commit-hooks",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1709087332,
+        "narHash": "sha256-HG2cCnktfHsKV0s4XW83gU3F57gaTljL9KNSuG6bnQs=",
+        "owner": "hercules-ci",
+        "repo": "gitignore.nix",
+        "rev": "637db329424fd7e46cf4185293b9cc8c88c95394",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hercules-ci",
+        "repo": "gitignore.nix",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1748190013,
+        "narHash": "sha256-R5HJFflOfsP5FBtk+zE8FpL8uqE7n62jqOsADvVshhE=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "62b852f6c6742134ade1abdd2a21685fd617a291",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs-lib": {
+      "locked": {
+        "lastModified": 1743296961,
+        "narHash": "sha256-b1EdN3cULCqtorQ4QeWgLMrd5ZGOjLSLemfa00heasc=",
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "rev": "e4822aea2a6d1cdd36653c134cacfd64c97ff4fa",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1730768919,
+        "narHash": "sha256-8AKquNnnSaJRXZxc5YmF/WfmxiHX6MMZZasRP6RRQkE=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "a04d33c0c3f1a59a2c1cb0c6e34cd24500e5a1dc",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "pre-commit-hooks": {
+      "inputs": {
+        "flake-compat": "flake-compat",
+        "gitignore": "gitignore",
+        "nixpkgs": "nixpkgs_2"
+      },
+      "locked": {
+        "lastModified": 1747372754,
+        "narHash": "sha256-2Y53NGIX2vxfie1rOW0Qb86vjRZ7ngizoo+bnXU9D9k=",
+        "owner": "cachix",
+        "repo": "git-hooks.nix",
+        "rev": "80479b6ec16fefd9c1db3ea13aeb038c60530f46",
+        "type": "github"
+      },
+      "original": {
+        "owner": "cachix",
+        "repo": "git-hooks.nix",
+        "type": "github"
+      }
+    },
+    "pyproject-build-systems": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "pyproject-nix": [
+          "pyproject-nix"
+        ],
+        "uv2nix": [
+          "uv2nix"
+        ]
+      },
+      "locked": {
+        "lastModified": 1744599653,
+        "narHash": "sha256-nysSwVVjG4hKoOjhjvE6U5lIKA8sEr1d1QzEfZsannU=",
+        "owner": "pyproject-nix",
+        "repo": "build-system-pkgs",
+        "rev": "7dba6dbc73120e15b558754c26024f6c93015dd7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "pyproject-nix",
+        "repo": "build-system-pkgs",
+        "type": "github"
+      }
+    },
+    "pyproject-nix": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1746540146,
+        "narHash": "sha256-QxdHGNpbicIrw5t6U3x+ZxeY/7IEJ6lYbvsjXmcxFIM=",
+        "owner": "pyproject-nix",
+        "repo": "pyproject.nix",
+        "rev": "e09c10c24ebb955125fda449939bfba664c467fd",
+        "type": "github"
+      },
+      "original": {
+        "owner": "pyproject-nix",
+        "repo": "pyproject.nix",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "dagger": "dagger",
+        "flake-parts": "flake-parts",
+        "nixpkgs": "nixpkgs",
+        "pre-commit-hooks": "pre-commit-hooks",
+        "pyproject-build-systems": "pyproject-build-systems",
+        "pyproject-nix": "pyproject-nix",
+        "uv2nix": "uv2nix"
+      }
+    },
+    "uv2nix": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "pyproject-nix": [
+          "pyproject-nix"
+        ]
+      },
+      "locked": {
+        "lastModified": 1747949765,
+        "narHash": "sha256-1v8SFHOwUCvHDXFmQRjHZYawY19nxmtZ7zH/kwAGgj0=",
+        "owner": "pyproject-nix",
+        "repo": "uv2nix",
+        "rev": "ec0502250b48116fd3aa8e1347a2d0254bacd05e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "pyproject-nix",
+        "repo": "uv2nix",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
+</file>
+
+<file path="scripts/src/configuration/__init__.py">
+from .configuration import (
+    KCL_ROOT,
+    PROJECT_ROOT,
+    CRD_ROOT,
+    SCHEMA_ROOT,
+)
+
+from .models import (
+    KFile,
+    RemoteSchema
+)
+
+from .load_config import (
+    CRD_SPECS
+)
+
+__all__ = [
+    "PROJECT_ROOT",
+    "KCL_ROOT",
+    "KFile",
+    "CRD_SPECS",
+    "CRD_ROOT",
+    "SCHEMA_ROOT",
+    "RemoteSchema"
+]
+</file>
+
+<file path="scripts/src/kcl_tasks/e2e/kcl_helm_install.py">
+import json
+import subprocess
+
+from configuration import KFile
+from lib.test_ext.test_factory import make_kcl_named_test
+from helpers.kcl_helpers import Exec
+from ccgen.fluxcd_helm_controller.io.fluxcd.toolkit.helm.v2 import HelmRelease
+from cloudcoil.models.kubernetes.core.v1 import Namespace
+from cloudcoil.errors import ResourceNotFound
+
+# TODO: cover all files eventually
+@make_kcl_named_test(["crossplane_release.k"], lambda kf: "helm_releases" in kf.path.parts)
+def e2e_frp_kuttl(crossplane_release: KFile) -> None:
+    # Run flux sync
+    subprocess.run(["flux", "run"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    # Parse HelmRelease from KCL output
+    result = Exec(crossplane_release.path).json_result
+    release = HelmRelease.model_validate(json.loads(result))
+    metadata = release.metadata
+
+    # Check required metadata fields
+    if not metadata or not metadata.namespace or not metadata.name:
+        raise ValueError("HelmRelease.metadata.namespace and name are required")
+
+    namespace_name = metadata.namespace
+    release_name = metadata.name
+
+    # Ensure namespace exists
+    try:
+        Namespace.get(name=namespace_name)
+        print(f"Namespace '{namespace_name}' already exists.")
+    except ResourceNotFound:
+        ns = (
+            Namespace.builder()
+            .metadata(lambda m: m.name(namespace_name))
+            .build()
+            .create()
+        )
+        for event, _ in ns.watch():
+            if event == "ADDED":
+                print(f"Namespace '{namespace_name}' created.")
+                break
+
+    # Ensure HelmRelease exists
+    try:
+        HelmRelease.get(name=release_name, namespace=namespace_name)
+        print(f"HelmRelease '{release_name}' already exists.")
+    except ResourceNotFound:
+        for event, _ in release.create().watch(namespace=namespace_name):
+            if event == "ADDED":
+                print(f"HelmRelease '{release_name}' created.")
+                break
+</file>
+
+<file path="scripts/src/kcl_tasks/check/kcl_has_export.py">
+from configuration import KFile
+from lib.test_ext.test_factory import make_kcl_test
+
+@make_kcl_test(lambda kf: "base" in kf.path.parts)
+def check_has_export(kf: KFile) -> None:
+    content = kf.path.read_text()
+    assert "manifests.yaml_stream(" in content, (
+        f'\n\nmust include "manifests.yaml_stream" and must export something for consistency: {kf.path}\n\n'
+    )
+</file>
+
+<file path="kcl.mod">
+[package]
+name = "home_network"
+edition = "v0.11.2"
+version = "0.0.2"
+
+[dependencies]
+k8s = { path = "kcl_common/schemas/oci/ghcr.io/kcl-lang/k8s/k8s/", version = "1.32.4" }
+</file>
+
+<file path="scripts/src/kcl_tasks/check/kcl_frp_verify.py">
+import subprocess
+from pathlib import Path
+
+from configuration import KFile
+from lib.test_ext.test_factory import make_kcl_named_test
+from helpers.kcl_helpers import Exec
+
+def run_frp_verify(name: str, kf: KFile, tmp_path: Path) -> None:
+    config_path = tmp_path / f"{name}.json"
+    config_path.write_text(Exec(kf.path).json_result)
+
+    completed = subprocess.run(
+        [name, "verify", f"--config={config_path}"],
+        capture_output=True,
+        check=False
+    )
+
+    assert completed.returncode == 0, (
+        f"{name} verify failed\n"
+        f"stdout: {completed.stdout.decode()}\n"
+        f"stderr: {completed.stderr.decode()}"
+    )
+
+@make_kcl_named_test(["FRPC_Config.k", "FRPS_Config.k"],  lambda kf: (
+    kf.path.name in {"FRPC_Config.k", "FRPS_Config.k"}
+))
+def check_frp_validate(clientconfig_kf: KFile, serverconfig_kf: KFile, tmp_path: Path) -> None:
+    run_frp_verify("frpc", clientconfig_kf, tmp_path)
+    run_frp_verify("frps", serverconfig_kf, tmp_path)
+</file>
+
+<file path="scripts/src/helpers/kcl_helpers.py">
+from contextlib import contextmanager
+from typing import Generator, Mapping
+from pathlib import Path
+import shutil
+
+from kcl_lib.api.spec_pb2 import OverrideFile_Result
+from kcl_lib import api as bapi
+from configuration import KCL_ROOT
+from threading import Lock
+from typing import Optional, Any
+from kcl_lib.api import UpdateDependencies_Args, ExecProgram_Result
+from google.protobuf.json_format import MessageToDict
+
+# === KCL Context Singleton ===
+
+class KCLContext:
+    _instance: Optional["KCLContext"] = None
+    _lock: Lock = Lock()
+
+    def __init__(self) -> None:
+        if getattr(self, "_initialized", False):
+            return
+
+        self.api: bapi.API = bapi.API()
+        deps_args = UpdateDependencies_Args(manifest_path=str(KCL_ROOT))
+        deps_result = self.api.update_dependencies(deps_args)
+        self.external_pkgs = deps_result.external_pkgs
+        self._initialized = True
+
+    @classmethod
+    def instance(cls) -> "KCLContext":
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls()
+        return cls._instance
+
+# === Execution Helpers ===
+
+def Exec(path: Path) -> ExecProgram_Result:
+    ctx = KCLContext.instance()
+    exec_args = bapi.ExecProgram_Args(
+        k_filename_list=[str(path.absolute())],
+        external_pkgs=ctx.external_pkgs
+    )
+    result = ctx.api.exec_program(exec_args)
+    if result.err_message:
+        raise RuntimeError(f"KCL execution failed:\n{result.err_message}")
+    return result
+
+def Override(path: Path, specs: list[str]) -> OverrideFile_Result:
+    ctx = KCLContext.instance()
+    return ctx.api.override_file(bapi.OverrideFile_Args(
+        file=str(path.absolute()), specs=specs
+    ))
+
+@contextmanager
+def Override_file_tmp_multi(
+    overrides: Mapping[Path, list[str]]
+) -> Generator[dict[Path, OverrideFile_Result], None, None]:
+    backups: dict[Path, Path] = {}
+    for path in overrides:
+        backup: Path = path.with_suffix(path.suffix + ".bak")
+        shutil.copy2(path, backup)
+        backups[path] = backup
+
+    try:
+        results: dict[Path, OverrideFile_Result] = {
+            path: Override(path, specs) for path, specs in overrides.items()
+        }
+        yield results
+    finally:
+        for path, backup in backups.items():
+            shutil.move(backup, path)
+
+def ListVariables(path: Path) -> dict[str, Any]:
+    ctx = KCLContext.instance()
+    args = bapi.ListVariables_Args(files=[str(path)])
+    return MessageToDict(ctx.api.list_variables(args))
+</file>
+
+<file path="Justfile">
+# KCL Project Automation Justfile
+
+# ────────────────
+# Generate Go-based KCL schemas
+# ────────────────
+[working-directory: "kcl_common/schemas/custom/go"]
+gen-go-schema:
+    go run schema-gen.go
+
+# ────────────────
+# Full environment setup
+# ────────────────
+all:
+    just gen-go-schema
+    fetch_helm_values
+    fetch_crds
+
+# ────────────────
+# Git commit shortcut
+# ────────────────
+git-commit MESSAGE:
+    git add .
+    git commit -m "{{MESSAGE}}"
+    git push
+
+# ────────────────
+# Run tests with optional filter
+# ────────────────
+[no-exit-message]
+test K_EXPRESSION="":
+    @bash -c 'if [ "{{K_EXPRESSION}}" = "" ]; then pytest; else pytest -k "{{K_EXPRESSION}}"; fi'
+
+# ────────────────
+# Synth pipeline
+# ────────────────
+[working-directory: "scripts"]
+check-kcl:
+    pytest src/kcl_tasks/check
+
+clean-synth:
+    rm -rf synth_yaml/*
+
+[working-directory: "scripts"]
+check-synth:
+    pytest src/kcl_tasks/automation/kcl_synth_yaml.py
+
+synth: check-kcl clean-synth check-synth
+</file>
+
+<file path=".gitignore">
+# KUTTL output
+kubeconfig
+
+# Env files
+.env*
+!.envrc
+
+# Editor & system
+.vscode/
+.idea/
+.DS_Store
+
+# OS / misc
+*.pid
+*.pid.lock
+*.tgz
+.cache/
+coverage/
+*.lcov
+logs/
+*.log
+
+kind-config.yaml
+
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.venv
+.cache/
+
+# CLI artifact scripts / outputs
+scripts/src/cli/artifacts/*.json
+scripts/src/cli/artifacts/*.yaml
+scripts/src/cli/artifacts/__pycache__/
+scripts/src/ccgen/
+
+# Nix handles this
+.pre-commit-config.yaml
+.direnv
+.nix-shell-env/
+</file>
+
+<file path="flake.nix">
+{
+  description = "Nim + Kubernetes + uv2nix Python + Go dev environment";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-parts.url = "github:hercules-ci/flake-parts";
+    uv2nix.url = "github:pyproject-nix/uv2nix";
+    pyproject-nix.url = "github:pyproject-nix/pyproject.nix";
+    pyproject-build-systems.url = "github:pyproject-nix/build-system-pkgs";
+    pre-commit-hooks.url = "github:cachix/git-hooks.nix";
+
+    dagger.url = "github:dagger/nix";
+    dagger.inputs.nixpkgs.follows = "nixpkgs";
+
+    # Input linking
+    uv2nix.inputs.nixpkgs.follows = "nixpkgs";
+    uv2nix.inputs.pyproject-nix.follows = "pyproject-nix";
+    pyproject-nix.inputs.nixpkgs.follows = "nixpkgs";
+    pyproject-build-systems.inputs.nixpkgs.follows = "nixpkgs";
+    pyproject-build-systems.inputs.pyproject-nix.follows = "pyproject-nix";
+    pyproject-build-systems.inputs.uv2nix.follows = "uv2nix";
+  };
+
+  outputs =
+    inputs@{
+      self,
+      nixpkgs,
+      flake-parts,
+      uv2nix,
+      pyproject-nix,
+      pyproject-build-systems,
+      pre-commit-hooks,
+      dagger,
+      ...
+    }:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = [
+        "x86_64-linux"
+        "aarch64-darwin"
+        "aarch64-linux"
+      ];
+
+      perSystem =
+        { pkgs, system, ... }:
+        let
+          lib = pkgs.lib;
+          kindShellScript = import ./flake-modules/kind-init.nix { inherit pkgs; };
+
+          uv2nixLib = uv2nix.lib;
+          pythonEnv = import ./flake-modules/python.nix {
+            inherit
+              pkgs
+              system
+              uv2nixLib
+              pyproject-nix
+              pyproject-build-systems
+              ;
+            workspaceRoot = ./scripts;
+          };
+
+          makePythonCli = import ./flake-modules/make-python-cli.nix;
+
+          pyCliTools = [
+            (makePythonCli {
+              inherit pkgs;
+              name = "fetch_crds";
+              scriptPath = ./scripts/src/cli/artifacts/fetch_crds.py;
+              python = pythonEnv.virtualenv;
+            })
+          ];
+
+          gitHooks = import ./flake-modules/git-hooks.nix { inherit lib; };
+
+          pre-commit = pre-commit-hooks.lib.${system}.run {
+            src = ./.;
+            hooks = gitHooks.pre-commit.hooks;
+          };
+
+          nixTools = with pkgs; [
+            nixfmt-rfc-style
+            nil
+            nixd
+          ];
+
+          shellTools = with pkgs; [
+            just
+            git
+            uv
+          ];
+
+          kubeTools = with pkgs; [
+            talosctl
+            kind
+            kubectl
+            kuttl
+            kubernetes-helm
+            kcl
+            go
+            crossplane-cli
+            fluxcd
+          ];
+
+          daggerTools = [ dagger.packages.${system}.dagger ];
+
+          uptestPkg = import ./flake-modules/uptest.nix { inherit pkgs; };
+
+        in
+        {
+          checks.pre-commit-check = pre-commit;
+
+          devShells.default = pkgs.mkShell {
+            packages =
+              nixTools
+              ++ shellTools
+              ++ [ pythonEnv.virtualenv ]
+              ++ kubeTools
+              ++ daggerTools
+              ++ pyCliTools
+              ++ pre-commit.enabledPackages
+              ++ [ uptestPkg.uptest ];
+
+            env = {
+              UV_PYTHON = "${pythonEnv.virtualenv}/bin/python";
+              UV_PYTHON_DOWNLOADS = "never";
+            };
+
+            shellHook = ''
+              ${pre-commit.shellHook}
+
+              unset PYTHONPATH
+              export REPO_ROOT=$(git rev-parse --show-toplevel)
+              export PYTHONPATH=$PWD/scripts/src:$PYTHONPATH
+              export CHAINSAW=$(which chainsaw)
+              export KUBECTL=$(which kubectl)
+
+              ${kindShellScript}/bin/kind-shell-hook
+
+              echo "🐍 Python dev shell (uv2nix) ready 🐥"
+
+              cd $REPO_ROOT/kcl_common/schemas/custom/go || true
+              go mod tidy || true
+              cd - || true
+            '';
+          };
+        };
+    };
+}
+</file>
+
+<file path="scripts/src/kcl_tasks/conftest.py">
+from pydantic import BaseModel, model_validator
+from typing import Optional, List, Callable
+from configuration import KFile
+
+class KclTestMetadata(BaseModel):
+    kcl_all_files: List[KFile] = []
+    kcl_filter_fn: Optional[Callable[[KFile], bool]] = None
+    kcl_group_filenames: Optional[List[str]] = None
+    kcl_group_filter: Optional[Callable[[KFile], bool]] = None
+
+    @property
+    def use_single_file_tests(self) -> bool:
+        return callable(self.kcl_filter_fn)
+
+    @property
+    def use_named_group_tests(self) -> bool:
+        return (
+            self.kcl_group_filenames is not None
+            and len(self.kcl_group_filenames) > 0
+            and callable(self.kcl_group_filter)
+        )
+
+    @model_validator(mode='after')
+    def validate_filters(self):
+        if self.kcl_filter_fn is not None and not callable(self.kcl_filter_fn):
+            raise ValueError("kcl_filter_fn must be callable or None")
+        if self.kcl_group_filter is not None and not callable(self.kcl_group_filter):
+            raise ValueError("kcl_group_filter must be callable or None")
+        if self.kcl_group_filenames is not None and not isinstance(self.kcl_group_filenames, list):
+            raise ValueError("kcl_group_filenames must be a list or None")
+        return self
+
+from pytest import Metafunc
+from lib.test_ext.find_kcl_files import find_kcl_files
+
+def pytest_configure(config):
+    config._kcl_metadata = KclTestMetadata(kcl_all_files=find_kcl_files())
+
+def pytest_generate_tests(metafunc: Metafunc):
+    # Always start with the global file list
+    all_files = getattr(metafunc.config, "_kcl_metadata", KclTestMetadata()).kcl_all_files
+
+    # Read metadata *per test function*
+    kcl_filter_fn = getattr(metafunc.function, "_kcl_filter_fn", None)
+    kcl_group_filenames = getattr(metafunc.function, "_kcl_group_filenames", None)
+    kcl_group_filter = getattr(metafunc.function, "_kcl_group_filter", None)
+
+    metadata = KclTestMetadata(
+        kcl_all_files=all_files,
+        kcl_filter_fn=kcl_filter_fn,
+        kcl_group_filenames=kcl_group_filenames,
+        kcl_group_filter=kcl_group_filter,
+    )
+
+    if metadata.use_single_file_tests and "kf" in metafunc.fixturenames:
+        _generate_single_file_tests(metafunc, metadata)
+        return
+
+    if metadata.use_named_group_tests:
+        _generate_named_group_file_tests(metafunc, metadata)
+        return
+
+def _generate_single_file_tests(metafunc: Metafunc, metadata: KclTestMetadata):
+    matched = [kf for kf in metadata.kcl_all_files if metadata.kcl_filter_fn(kf)]
+    if not matched:
+        raise ValueError(f"No KCL files matched for {metafunc.function.__name__}")
+
+    ids = [str(kf.path.relative_to(kf.path.parents[2])) for kf in matched]
+    metafunc.parametrize("kf", matched, ids=ids)
+
+def _generate_named_group_file_tests(metafunc: Metafunc, metadata: KclTestMetadata):
+    filtered = [kf for kf in metadata.kcl_all_files if metadata.kcl_group_filter(kf)]
+
+    matched = []
+    for fname in metadata.kcl_group_filenames:
+        match = next((kf for kf in filtered if kf.path.name == fname), None)
+        if not match:
+            raise ValueError(f"File '{fname}' not found in filtered files for {metafunc.function.__name__}")
+        matched.append(match)
+
+    argnames = [
+        name for name in metafunc.function.__code__.co_varnames
+        if name in metafunc.fixturenames and name != "tmp_path"
+    ][:len(matched)]
+
+    if len(argnames) != len(matched):
+        raise ValueError(
+            f"{metafunc.function.__name__} expects {len(argnames)} args but {len(matched)} files were matched"
+        )
+
+    if len(argnames) == 1:
+        metafunc.parametrize(
+            argnames[0],
+            matched,
+            ids=[kf.path.name for kf in matched],
+        )
+    else:
+        metafunc.parametrize(
+            ",".join(argnames),
+            [tuple(matched)],
+            ids=[",".join(kf.path.name for kf in matched)],
+        )
+</file>
+
+<file path="scripts/src/kcl_tasks/automation/kcl_synth_yaml.py">
+from configuration import KFile, ProjectFilters, PROJECT_ROOT
+from lib.test_ext.test_factory import make_kcl_test
+from helpers.kcl_helpers import Exec
+
+@make_kcl_test(ProjectFilters.CONTROL)
+def auto_generate_yaml_synth(pf: ProjectFilters, kf: KFile) -> None:
+    synth_dir = PROJECT_ROOT / "synth_yaml"
+    synth_dir.mkdir(parents=True, exist_ok=True)
+
+    output_path = synth_dir / f"{kf.path.stem}.yaml"
+    result = Exec(kf.path)
+    output_path.write_text(result.yaml_result)
+</file>
+
+<file path="scripts/pyproject.toml">
+[project]
+name = "scripts"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13" # KEEP IN SYNC WITH BELOW! \/
+dependencies = [
+    "cloudcoil[fluxcd,kubernetes,test]>=0.5.8",
+    "colored>=2.3.0",
+    "crossplane-function-sdk-python>=0.7.0",
+    "dagger-io>=0.18.10",
+    "datamodel-code-generator>=0.31.2",
+    "deepdiff>=8.5.0",
+    "docker>=7.1.0",
+    "filelock>=3.18.0",
+    "funcy>=2.0",
+    "funcy-pipe>=0.11.1",
+    "genson>=1.3.0",
+    "grpcio>=1.71.0",
+    "kcl-lib>=0.11.2",
+    "kubernetes>=33.1.0",
+    "pipe>=2.2",
+    "pydantic>=2.11.5",
+    "pytest>=8.3.5",
+    "pytest-print>=1.1.0",
+    "pytest-subtests>=0.14.1",
+    "pytest-sugar>=1.0.0",
+    "pytest-xdist>=3.7.0",
+    "pyyaml>=6.0.2",
+    "rich>=14.0.0",
+    "ruff>=0.11.12",
+    "toml>=0.10.2",
+    "whatever>=0.7",
+]
+
+# Our tools settings
+[tool.kcltest_config]
+debug = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py313" # KEEP IN SYNC WITH ABOVE! /\
+
+
+[tool.pyright]
+include = ["src"]
+reportMissingTypeStubs = "none"
+typeCheckingMode = "strict"
+ignore = ["src/kcl_tasks/conftest.py"]
+
+[tool.pytest.ini_options]
+markers = [
+    "configure_test_cluster: mark tests that require configuring a test k3d cluster via Cloudcoil",
+]
+minversion = "6.0"
+# Once we have enough tests, we can also add "-n auto" to run all of them in parallel
+# For now single threaded will almost always be faster
+python_functions = ["auto_*", "check_*", "e2e_*", "py_"]
+addopts = "-ra -s -v  -p no:unraisableexception"
+testpaths = ["src/kcl_tasks"]
+python_files = ["kcl_*", "py_*"]
+filterwarnings = [
+    "ignore::UserWarning:google.protobuf.runtime_version",
+    'ignore:function ham\(\) is deprecated:DeprecationWarning',
+    "ignore:Implicitly cleaning up.*TemporaryDirectory:ResourceWarning",
+]
+
+[tool.ruff.lint]
+# Enable additional lint rule sets (beyond Ruff's defaults):
+# F   = Pyflakes (undefined names, unused imports, etc.)
+# I   = isort (import sorting)
+# UP  = pyupgrade (modernize code to newer Python syntax)
+# B   = bugbear (common bugs & design issues)
+# SIM = flake8-simplify (unnecessary conditionals, redundant logic)
+extend-select = ["F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+plugins = ["pydantic.mypy", "cloudcoil.mypy"]
+</file>
+
+<file path="scripts/src/configuration/configuration.py">
+# configuration/load_config.py
+
+from lib.test_ext.find_proj_root import find_project_root
+
+
+# --- Paths ---
+PROJECT_ROOT = find_project_root()
+KCL_ROOT = (PROJECT_ROOT / "").resolve()
+CRD_ROOT = KCL_ROOT / "crds"
+SCHEMA_ROOT = PROJECT_ROOT / "kcl_common" / "schemas"
+</file>
+
+</files>
